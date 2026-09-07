@@ -328,7 +328,7 @@ export class SyncService {
     awakeMinutes: number | null;
     rawJson: string;
   } | null {
-    const id = point?.name;
+    const id = point?.name ?? point?.dataPointName;
     const sleep = point?.sleep;
     const startTime = sleep?.interval?.startTime;
     const endTime = sleep?.interval?.endTime;

@@ -86,6 +86,7 @@ export function openDatabase(dataDir: string): AppDatabase {
   mkdirSync(dataDir, { recursive: true });
   const db = new Database(path.join(dataDir, "app.db"));
   db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 5000");
   migrate(db);
   return db;
 }
