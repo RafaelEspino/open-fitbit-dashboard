@@ -9,6 +9,7 @@ import { BackfillManager } from "./health/backfill.js";
 import { startScheduler, type SchedulerHandle } from "./health/scheduler.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createSyncRouter } from "./routes/sync.js";
+import { createMetricsRouter } from "./routes/metrics.js";
 
 const config = loadConfig();
 const db = openDatabase(config.dataDir);
@@ -49,6 +50,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
 
 app.use("/api/auth", createAuthRouter({ db, config, tokenStore, client, backfill, onConnected, onDisconnected }));
 app.use("/api/sync", createSyncRouter({ db, config, sync, backfill, client, tokenStore }));
+app.use("/api/metrics", createMetricsRouter(db));
 
 const indexHtml = path.join(config.staticDir, "index.html");
 app.use((req: Request, res: Response, next: NextFunction) => {
