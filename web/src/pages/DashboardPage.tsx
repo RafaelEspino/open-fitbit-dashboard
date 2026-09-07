@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Activity,
+  Footprints,
+  HeartPulse,
+  Moon,
+  type LucideIcon,
+} from "lucide-react";
+import {
   fetchActivities,
   fetchDaily,
   fetchHr,
@@ -10,14 +17,10 @@ import {
   type SleepLog,
 } from "../api";
 import { formatHours, formatNumber, latestByDate } from "../format";
-import {
-  Card,
-  ChartCard,
-  EmptyState,
-  ErrorState,
-  RangeSelector,
-  Spinner,
-} from "../components/ui";
+import { StatCard, StatSkeleton } from "../components/StatCard";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   IntradayHrChart,
   RestingHrChart,
@@ -25,37 +28,15 @@ import {
   StepsChart,
   type DailyRow,
   type HrHourRow,
-} from "../components/Charts";
-
-const RANGES = [7, 30, 90] as const;
+} from "@/components/Charts";
 
 export default function DashboardPage() {
   const [days, setDays] = useState<number>(30);
 
-  const daily = useQuery({
-    queryKey: ["daily", days],
-    queryFn: () => fetchDaily(days),
-  });
-  const sleep = useQuery({
-    queryKey: ["sleep", days],
-    queryFn: () => fetchSleep(days),
-  });
-  const hrDates = useQuery({
-    queryKey: ["hrDates", days],
-    queryFn: () => fetchHrDates(days),
-  });
-
-  const dailyRows = useMemo<DailyRow[]>(
-    () =>
-      (daily.data ?? []).map((r) => ({
-        date: r.date,
-        resting_hr: r.resting_hr,
-        steps: r.steps,
-        sleep_hours: r.sleep_minutes != null ? r.sleep_minutes / 60 : null,
-        sleep_efficiency: r.sleep_efficiency,
-      })),
-    [daily.data]
-  );
+  const daily = useQuery({ queryKey: ["daily", days], queryFn: () => fetchDaily(days) });
+  const sleep = useQuery({ queryKey: ["sleep", days], queryFn: () => fetchSleep(days) });
+  const hrDates = useQuery({ queryKey: ["hrDates", days], queryFn: () => fetchHrDates(days) });
+  const activities = useQuery({ queryKey: ["activities", days], queryFn: () => fetchActivities(days) });
 
   const sleepByDate = useMemo(() => {
     const map = new Map<string, SleepLog>();
@@ -68,28 +49,40 @@ export default function DashboardPage() {
     return map;
   }, [sleep.data]);
 
-  const chartRows = useMemo(
-    () =>
-      dailyRows.map((r) => {
-        const sleepRow = sleepByDate.get(r.date);
-        return {
-          ...r,
-          sleep_hours: sleepRow?.minutes_asleep != null ? sleepRow.minutes_asleep / 60 : r.sleep_hours,
-          sleep_efficiency: sleepRow?.efficiency ?? r.sleep_efficiency,
-        };
-      }),
-    [dailyRows, sleepByDate]
-  );
+  const chartRows = useMemo<DailyRow[]>(() => {
+    const base = new Map<string, DailyRow>();
+    for (const r of daily.data ?? []) {
+      base.set(r.date, {
+        date: r.date,
+        resting_hr: r.resting_hr,
+        steps: r.steps,
+        sleep_hours: r.sleep_minutes != null ? r.sleep_minutes / 60 : null,
+        sleep_efficiency: r.sleep_efficiency,
+      });
+    }
+    for (const [date, s] of sleepByDate) {
+      const row = base.get(date) ?? {
+        date,
+        resting_hr: null,
+        steps: null,
+        sleep_hours: null,
+        sleep_efficiency: null,
+      };
+      base.set(date, {
+        ...row,
+        sleep_hours: s.minutes_asleep != null ? s.minutes_asleep / 60 : row.sleep_hours,
+        sleep_efficiency: s.efficiency ?? row.sleep_efficiency,
+      });
+    }
+    return [...base.values()].sort((a, b) => a.date.localeCompare(b.date));
+  }, [daily.data, sleepByDate]);
 
   const latestDaily = latestByDate(daily.data ?? []);
   const latestSleep = latestByDate(sleep.data ?? []);
+  const hasDaily = chartRows.length > 0;
 
   const [hrDate, setHrDate] = useState<string | null>(null);
-  const hrLatest = useQuery({
-    queryKey: ["hrLatest"],
-    queryFn: fetchHrLatest,
-    staleTime: 300_000,
-  });
+  const hrLatest = useQuery({ queryKey: ["hrLatest"], queryFn: fetchHrLatest, staleTime: 300_000 });
   const activeHrDate = hrDate ?? hrLatest.data?.date ?? null;
   const hrRows = useQuery({
     queryKey: ["hr", activeHrDate],
@@ -107,139 +100,203 @@ export default function DashboardPage() {
     [hrRows.data]
   );
 
-  const activities = useQuery({
-    queryKey: ["activities", days],
-    queryFn: () => fetchActivities(days),
-  });
-
-  const hasDaily = chartRows.length > 0;
-
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-100">Overview</h2>
-        <RangeSelector days={days} onChange={setDays} />
+        <h2 className="text-lg font-semibold tracking-tight">Overview</h2>
+        <Tabs value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+          <TabsList>
+            <TabsTrigger value="7">7d</TabsTrigger>
+            <TabsTrigger value="30">30d</TabsTrigger>
+            <TabsTrigger value="90">90d</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Card
-          title="Resting HR"
-          value={latestDaily?.resting_hr != null ? `${Math.round(latestDaily.resting_hr)} bpm` : "—"}
-          sub={latestDaily ? latestDaily.date : ""}
-          accent="text-rose-300"
-        />
-        <Card
-          title="Steps"
-          value={formatNumber(latestDaily?.steps)}
-          sub={latestDaily ? latestDaily.date : ""}
-          accent="text-sky-300"
-        />
-        <Card
-          title="Sleep"
-          value={formatHours(latestSleep?.minutes_asleep ?? latestDaily?.sleep_minutes)}
-          sub={
-            latestSleep?.efficiency != null
-              ? `${Math.round(latestSleep.efficiency)}% efficient · ${latestSleep.date}`
-              : latestSleep
-                ? latestSleep.date
-                : ""
-          }
-          accent="text-indigo-300"
-        />
-        <Card
-          title="Active minutes"
-          value={formatNumber(latestDaily?.active_minutes)}
-          sub={latestDaily ? latestDaily.date : ""}
-          accent="text-emerald-300"
-        />
+        {daily.isLoading ? (
+          <>
+            <StatSkeleton />
+            <StatSkeleton />
+            <StatSkeleton />
+            <StatSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              icon={HeartPulse as LucideIcon}
+              title="Resting HR"
+              value={latestDaily?.resting_hr != null ? `${Math.round(latestDaily.resting_hr)} bpm` : "—"}
+              sub={latestDaily ? latestDaily.date : undefined}
+              iconClassName="text-red-400"
+            />
+            <StatCard
+              icon={Footprints as LucideIcon}
+              title="Steps"
+              value={formatNumber(latestDaily?.steps)}
+              sub={latestDaily ? latestDaily.date : undefined}
+              iconClassName="text-blue-400"
+            />
+            <StatCard
+              icon={Moon as LucideIcon}
+              title="Sleep"
+              value={formatHours(latestSleep?.minutes_asleep ?? latestDaily?.sleep_minutes)}
+              sub={
+                latestSleep?.efficiency != null
+                  ? `${Math.round(latestSleep.efficiency)}% efficient · ${latestSleep.date}`
+                  : latestSleep
+                    ? latestSleep.date
+                    : undefined
+              }
+              iconClassName="text-violet-400"
+            />
+            <StatCard
+              icon={Activity as LucideIcon}
+              title="Active minutes"
+              value={formatNumber(latestDaily?.active_minutes)}
+              sub={latestDaily ? latestDaily.date : undefined}
+              iconClassName="text-emerald-400"
+            />
+          </>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Resting heart rate">
-          {daily.isLoading ? (
-            <Spinner />
-          ) : daily.isError ? (
-            <ErrorState message={`Failed to load metrics: ${(daily.error as Error).message}`} />
-          ) : !hasDaily ? (
-            <EmptyState message="No synced data yet — wait for the first sync to finish." />
-          ) : (
+        <MetricCard title="Resting heart rate">
+          <ChartState
+            isLoading={daily.isLoading}
+            error={daily.isError ? (daily.error as Error).message : null}
+            isEmpty={!hasDaily}
+            emptyMessage="No synced data yet — wait for the first sync to finish."
+          >
             <RestingHrChart data={chartRows} />
-          )}
-        </ChartCard>
+          </ChartState>
+        </MetricCard>
 
-        <ChartCard title="Steps">
-          {daily.isLoading ? (
-            <Spinner />
-          ) : daily.isError ? (
-            <ErrorState message={`Failed to load metrics: ${(daily.error as Error).message}`} />
-          ) : !hasDaily ? (
-            <EmptyState message="No synced data yet — wait for the first sync to finish." />
-          ) : (
+        <MetricCard title="Steps">
+          <ChartState
+            isLoading={daily.isLoading}
+            error={daily.isError ? (daily.error as Error).message : null}
+            isEmpty={!hasDaily}
+            emptyMessage="No synced data yet — wait for the first sync to finish."
+          >
             <StepsChart data={chartRows} />
-          )}
-        </ChartCard>
+          </ChartState>
+        </MetricCard>
 
-        <ChartCard title="Sleep duration & efficiency">
-          {sleep.isLoading ? (
-            <Spinner />
-          ) : sleep.isError ? (
-            <ErrorState message={`Failed to load sleep: ${(sleep.error as Error).message}`} />
-          ) : chartRows.every((r) => r.sleep_hours == null) ? (
-            <EmptyState message="No sleep sessions in this range." />
-          ) : (
+        <MetricCard title="Sleep duration & efficiency">
+          <ChartState
+            isLoading={sleep.isLoading}
+            error={sleep.isError ? (sleep.error as Error).message : null}
+            isEmpty={chartRows.every((r) => r.sleep_hours == null)}
+            emptyMessage="No sleep sessions in this range."
+          >
             <SleepChart data={chartRows} />
-          )}
-        </ChartCard>
+          </ChartState>
+        </MetricCard>
 
-        <ChartCard
-          title="Intraday heart rate"
-          actions={
-            (hrDates.data?.length ?? 0) > 0 ? (
-              <select
-                value={activeHrDate ?? ""}
-                onChange={(e) => setHrDate(e.target.value)}
-                className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200"
-              >
-                {hrDates.data!.slice(0, 90).map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            ) : null
-          }
-        >
-          {hrRows.isLoading ? (
-            <Spinner />
-          ) : hrRows.isError ? (
-            <ErrorState message={`Failed to load HR: ${(hrRows.error as Error).message}`} />
-          ) : hrHourRows.length === 0 ? (
-            <EmptyState message="No intraday HR data available yet." />
-          ) : (
-            <IntradayHrChart data={hrHourRows} />
-          )}
-        </ChartCard>
+        <Card>
+          <CardHeader>
+            <CardTitle>Intraday heart rate</CardTitle>
+            {(hrDates.data?.length ?? 0) > 0 ? (
+              <CardAction>
+                <Select
+                  value={activeHrDate ?? undefined}
+                  onValueChange={(v) => setHrDate(String(v))}
+                >
+                  <SelectTrigger size="sm" className="w-[130px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hrDates.data!.slice(0, 90).map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardAction>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            <ChartState
+              isLoading={hrRows.isLoading}
+              error={hrRows.isError ? (hrRows.error as Error).message : null}
+              isEmpty={hrHourRows.length === 0}
+              emptyMessage="No intraday HR data available yet."
+            >
+              <IntradayHrChart data={hrHourRows} />
+            </ChartState>
+          </CardContent>
+        </Card>
       </div>
 
-      <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-200">Recent workouts</h2>
-        {activities.isLoading ? (
-          <Spinner />
-        ) : activities.isError ? (
-          <ErrorState message={`Failed to load workouts: ${(activities.error as Error).message}`} />
-        ) : (activities.data?.length ?? 0) === 0 ? (
-          <EmptyState message="No workouts in this range." />
-        ) : (
-          <ul className="divide-y divide-slate-800">
-            {activities.data!.slice(0, 8).map((a) => (
-              <li key={a.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate-200">{a.type ?? "Workout"}</span>
-                <span className="text-slate-500">{a.date}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent workouts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activities.isLoading ? (
+            <div className="space-y-2">
+              <div className="h-5 rounded bg-muted/60" />
+              <div className="h-5 w-2/3 rounded bg-muted/60" />
+            </div>
+          ) : activities.isError ? (
+            <EmptyMessage className="text-destructive">
+              Failed to load workouts: {(activities.error as Error).message}
+            </EmptyMessage>
+          ) : (activities.data?.length ?? 0) === 0 ? (
+            <EmptyMessage>No workouts in this range.</EmptyMessage>
+          ) : (
+            <ul className="divide-y">
+              {activities.data!.slice(0, 8).map((a) => (
+                <li key={a.id} className="flex items-center justify-between py-2 text-sm">
+                  <span className="font-medium">{a.type ?? "Workout"}</span>
+                  <span className="text-muted-foreground">{a.date}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+function MetricCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function EmptyMessage({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex h-[220px] items-center justify-center text-sm text-muted-foreground ${className ?? ""}`}>
+      {children}
+    </div>
+  );
+}
+
+function ChartState({
+  isLoading,
+  error,
+  isEmpty,
+  emptyMessage,
+  children,
+}: {
+  isLoading: boolean;
+  error: string | null;
+  isEmpty: boolean;
+  emptyMessage: string;
+  children: React.ReactNode;
+}) {
+  if (isLoading) return <div className="h-[220px] rounded-lg bg-muted/40" />;
+  if (error) return <EmptyMessage className="text-destructive">{error}</EmptyMessage>;
+  if (isEmpty) return <EmptyMessage>{emptyMessage}</EmptyMessage>;
+  return children;
 }

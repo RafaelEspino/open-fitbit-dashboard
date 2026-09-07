@@ -2,38 +2,31 @@ import { useState } from "react";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import AiPage from "./pages/AiPage";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HeartPulse } from "lucide-react";
 
 type Page = "dashboard" | "ai" | "settings";
-
-const PAGES: { key: Page; label: string }[] = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "ai", label: "AI" },
-  { key: "settings", label: "Settings" },
-];
 
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-slate-800 bg-slate-900/60">
-        <div className="mx-auto flex max-w-6xl items-center gap-6 px-4 py-3">
-          <h1 className="text-lg font-semibold text-slate-100">Fitbit AI Dashboard</h1>
-          <nav className="flex gap-1">
-            {PAGES.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPage(p.key)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  page === p.key
-                    ? "bg-slate-700 text-white"
-                    : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </nav>
+    <div className="min-h-svh">
+      <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-lg bg-muted p-1.5">
+              <HeartPulse className="size-5 text-red-400" />
+            </div>
+            <h1 className="text-base font-semibold tracking-tight">Fitbit AI Dashboard</h1>
+          </div>
+          <Tabs value={page} onValueChange={(v) => setPage(v as Page)}>
+            <TabsList>
+              <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="ai">AI</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">

@@ -13,7 +13,7 @@ import {
 const CONTEXT_DAYS = 14;
 const MODELS_CACHE_MS = 24 * 60 * 60 * 1000;
 const MAX_HISTORY_MESSAGES = 20;
-const MAX_REPORTS_RETURNED = 20;
+const MAX_REPORT_PAGE_SIZE = 20;
 
 interface ChatHistoryRow {
   role: "user" | "assistant";
@@ -188,13 +188,25 @@ export function createAiRouter(db: AppDatabase, config: Config, ai: OpenRouterCl
     }
   });
 
-  router.get("/reports", (_req: Request, res: Response) => {
+  router.get("/reports", (req: Request, res: Response) => {
+    const requestedPageSize = Number(req.query.pageSize);
+    const pageSize = Number.isFinite(requestedPageSize)
+      ? Math.min(MAX_REPORT_PAGE_SIZE, Math.max(1, Math.round(requestedPageSize)))
+      : 5;
+    const totalRow = db.prepare("SELECT COUNT(*) AS c FROM ai_reports").get() as { c: number };
+    const total = totalRow.c;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const requestedPage = Number(req.query.page);
+    const page = Number.isFinite(requestedPage)
+      ? Math.min(totalPages, Math.max(1, Math.round(requestedPage)))
+      : 1;
     const rows = db
       .prepare(
-        "SELECT id, period, range_start, range_end, model, created_at FROM ai_reports ORDER BY id DESC LIMIT ?"
+        `SELECT id, period, range_start, range_end, model, created_at FROM ai_reports
+         ORDER BY id DESC LIMIT ? OFFSET ?`
       )
-      .all(MAX_REPORTS_RETURNED);
-    res.json({ reports: rows });
+      .all(pageSize, (page - 1) * pageSize);
+    res.json({ reports: rows, page, pageSize, total, totalPages });
   });
 
   router.get("/reports/:id", (req: Request, res: Response) => {

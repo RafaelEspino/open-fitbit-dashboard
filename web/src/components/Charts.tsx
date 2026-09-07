@@ -2,33 +2,22 @@ import {
   Area,
   AreaChart,
   Bar,
+  BarChart,
   CartesianGrid,
   ComposedChart,
   Line,
   LineChart,
-  ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-
-const axisProps = {
-  stroke: "#64748b",
-  tick: { fill: "#94a3b8", fontSize: 12 },
-  tickLine: false,
-};
-
-const tooltipStyle = {
-  backgroundColor: "#1e293b",
-  border: "1px solid #334155",
-  borderRadius: 8,
-  fontSize: 12,
-};
-
-const asNumber = (value: unknown): number | null => {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 export interface DailyRow {
   date: string;
@@ -38,90 +27,6 @@ export interface DailyRow {
   sleep_efficiency: number | null;
 }
 
-export function RestingHrChart({ data }: { data: DailyRow[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-        <CartesianGrid stroke="#1e293b" vertical={false} />
-        <XAxis dataKey="date" {...axisProps} tickFormatter={(d: string) => d.slice(5)} minTickGap={28} />
-        <YAxis {...axisProps} domain={["dataMin - 4", "dataMax + 4"]} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          labelStyle={{ color: "#e2e8f0" }}
-          formatter={(value) => [asNumber(value) != null ? `${Math.round(asNumber(value)!)} bpm` : "—", "Resting HR"]}
-        />
-        <Line
-          type="monotone"
-          dataKey="resting_hr"
-          stroke="#f87171"
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function StepsChart({ data }: { data: DailyRow[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-        <CartesianGrid stroke="#1e293b" vertical={false} />
-        <XAxis dataKey="date" {...axisProps} tickFormatter={(d: string) => d.slice(5)} minTickGap={28} />
-        <YAxis {...axisProps} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          labelStyle={{ color: "#e2e8f0" }}
-          formatter={(value) => [asNumber(value) != null ? Math.round(asNumber(value)!).toLocaleString() : "—", "Steps"]}
-        />
-        <Bar dataKey="steps" fill="#38bdf8" radius={[3, 3, 0, 0]} />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
-export function SleepChart({ data }: { data: DailyRow[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={220}>
-      <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-        <CartesianGrid stroke="#1e293b" vertical={false} />
-        <XAxis dataKey="date" {...axisProps} tickFormatter={(d: string) => d.slice(5)} minTickGap={28} />
-        <YAxis yAxisId="left" {...axisProps} label={{ value: "h", position: "insideLeft", fill: "#94a3b8" }} />
-        <YAxis
-          yAxisId="right"
-          orientation="right"
-          domain={[0, 100]}
-          {...axisProps}
-          tickFormatter={(v: number) => `${v}%`}
-        />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          labelStyle={{ color: "#e2e8f0" }}
-          formatter={(value, name) => {
-            const n = asNumber(value);
-            const label = String(name);
-            return label === "Sleep"
-              ? [n != null ? `${Math.floor(n)}h ${Math.round((n % 1) * 60)}m` : "—", label]
-              : [n != null ? `${Math.round(n)}%` : "—", label];
-          }}
-        />
-        <Bar yAxisId="left" dataKey="sleep_hours" name="Sleep" fill="#818cf8" radius={[3, 3, 0, 0]} />
-        <Line
-          yAxisId="right"
-          type="monotone"
-          dataKey="sleep_efficiency"
-          name="Efficiency"
-          stroke="#34d399"
-          strokeWidth={2}
-          dot={false}
-          connectNulls
-        />
-      </ComposedChart>
-    </ResponsiveContainer>
-  );
-}
-
 export interface HrHourRow {
   label: string;
   hr_avg: number | null;
@@ -129,26 +34,132 @@ export interface HrHourRow {
   hr_max: number | null;
 }
 
+const restingHrConfig = {
+  resting_hr: { label: "Resting HR", color: "var(--chart-1)" },
+} satisfies ChartConfig;
+
+const stepsConfig = {
+  steps: { label: "Steps", color: "var(--chart-2)" },
+} satisfies ChartConfig;
+
+const sleepConfig = {
+  sleep_hours: { label: "Sleep", color: "var(--chart-4)" },
+  sleep_efficiency: { label: "Efficiency", color: "var(--chart-3)" },
+} satisfies ChartConfig;
+
+const intradayConfig = {
+  hr_max: { label: "Max HR", color: "oklch(0.55 0 0)" },
+  hr_avg: { label: "Avg HR", color: "var(--chart-1)" },
+  hr_min: { label: "Min HR", color: "oklch(0.55 0 0)" },
+} satisfies ChartConfig;
+
+export function RestingHrChart({ data }: { data: DailyRow[] }) {
+  return (
+    <ChartContainer config={restingHrConfig} className="h-[220px] w-full">
+      <LineChart accessibilityLayer data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          minTickGap={28}
+          tickFormatter={(d: string) => d.slice(5)}
+        />
+        <YAxis tickLine={false} axisLine={false} width={36} domain={["dataMin - 4", "dataMax + 4"]} />
+        <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+        <Line
+          type="monotone"
+          dataKey="resting_hr"
+          stroke="var(--color-resting_hr)"
+          strokeWidth={2}
+          dot={false}
+          connectNulls
+        />
+      </LineChart>
+    </ChartContainer>
+  );
+}
+
+export function StepsChart({ data }: { data: DailyRow[] }) {
+  return (
+    <ChartContainer config={stepsConfig} className="h-[220px] w-full">
+      <BarChart accessibilityLayer data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          minTickGap={28}
+          tickFormatter={(d: string) => d.slice(5)}
+        />
+        <YAxis tickLine={false} axisLine={false} width={48} />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <Bar dataKey="steps" fill="var(--color-steps)" radius={4} />
+      </BarChart>
+    </ChartContainer>
+  );
+}
+
+export function SleepChart({ data }: { data: DailyRow[] }) {
+  return (
+    <ChartContainer config={sleepConfig} className="h-[220px] w-full">
+      <ComposedChart accessibilityLayer data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tickMargin={8}
+          minTickGap={28}
+          tickFormatter={(d: string) => d.slice(5)}
+        />
+        <YAxis yAxisId="sleep" tickLine={false} axisLine={false} width={32} />
+        <YAxis
+          yAxisId="eff"
+          orientation="right"
+          domain={[0, 100]}
+          tickLine={false}
+          axisLine={false}
+          width={44}
+          tickFormatter={(v: number) => `${v}%`}
+        />
+        <ChartTooltip content={<ChartTooltipContent />} />
+        <ChartLegend content={<ChartLegendContent />} />
+        <Bar yAxisId="sleep" dataKey="sleep_hours" fill="var(--color-sleep_hours)" radius={4} />
+        <Line
+          yAxisId="eff"
+          type="monotone"
+          dataKey="sleep_efficiency"
+          stroke="var(--color-sleep_efficiency)"
+          strokeWidth={2}
+          dot={false}
+          connectNulls
+        />
+      </ComposedChart>
+    </ChartContainer>
+  );
+}
+
 export function IntradayHrChart({ data }: { data: HrHourRow[] }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
-        <CartesianGrid stroke="#1e293b" vertical={false} />
-        <XAxis dataKey="label" {...axisProps} minTickGap={24} />
-        <YAxis {...axisProps} domain={["dataMin - 6", "dataMax + 6"]} />
-        <Tooltip
-          contentStyle={tooltipStyle}
-          labelStyle={{ color: "#e2e8f0" }}
-          formatter={(value, name) => {
-            const n = asNumber(value);
-            return [n != null ? Math.round(n) : "—", `${String(name)} HR`];
-          }}
+    <ChartContainer config={intradayConfig} className="h-[220px] w-full">
+      <AreaChart accessibilityLayer data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
+        <YAxis
+          tickLine={false}
+          axisLine={false}
+          width={36}
+          domain={["dataMin - 6", "dataMax + 6"]}
         />
+        <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+        <ChartLegend content={<ChartLegendContent />} />
         <Area
           type="monotone"
           dataKey="hr_max"
-          name="Max"
-          stroke="#fb7185"
+          stroke="var(--color-hr_max)"
           fill="none"
           strokeWidth={1.5}
           connectNulls
@@ -156,23 +167,21 @@ export function IntradayHrChart({ data }: { data: HrHourRow[] }) {
         <Area
           type="monotone"
           dataKey="hr_avg"
-          name="Avg"
-          stroke="#f87171"
-          fill="#7f1d1d"
-          fillOpacity={0.35}
+          stroke="var(--color-hr_avg)"
+          fill="var(--color-hr_avg)"
+          fillOpacity={0.15}
           strokeWidth={2}
           connectNulls
         />
         <Area
           type="monotone"
           dataKey="hr_min"
-          name="Min"
-          stroke="#fca5a5"
+          stroke="var(--color-hr_min)"
           fill="none"
           strokeWidth={1.5}
           connectNulls
         />
       </AreaChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   );
 }

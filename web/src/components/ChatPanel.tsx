@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eraser, SendHorizontal, Sparkles } from "lucide-react";
 import { clearChatHistory, fetchChatHistory, streamChat } from "../aiApi";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface DisplayMessage {
   role: "user" | "assistant";
@@ -14,7 +20,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (history.data && !streaming) {
@@ -23,7 +29,8 @@ export default function ChatPanel() {
   }, [history.data, streaming]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = viewportRef.current?.querySelector("[data-radix-scroll-area-viewport]");
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [messages]);
 
   const clear = useMutation({
@@ -40,13 +47,19 @@ export default function ChatPanel() {
     setInput("");
     setError(null);
     setStreaming(true);
-    setMessages((prev) => [...prev, { role: "user", content: message }, { role: "assistant", content: "" }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: message },
+      { role: "assistant", content: "" },
+    ]);
     await streamChat(message, {
       onDelta: (text) => {
         setMessages((prev) => {
           const next = [...prev];
           const last = next[next.length - 1];
-          if (last?.role === "assistant") next[next.length - 1] = { ...last, content: last.content + text };
+          if (last?.role === "assistant") {
+            next[next.length - 1] = { ...last, content: last.content + text };
+          }
           return next;
         });
       },
@@ -67,63 +80,70 @@ export default function ChatPanel() {
   }
 
   return (
-    <section className="flex h-[560px] flex-col rounded-xl border border-slate-800 bg-slate-900/60">
-      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-        <h2 className="text-sm font-semibold text-slate-200">AI Chat</h2>
-        <button
-          onClick={() => clear.mutate()}
-          disabled={messages.length === 0 || streaming}
-          className="text-xs text-slate-400 hover:text-slate-200 disabled:opacity-40"
-        >
-          Clear history
-        </button>
-      </div>
-      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {messages.length === 0 ? (
-          <p className="pt-16 text-center text-sm text-slate-500">
-            Ask anything about your health data — trends, sleep quality, training load…
-          </p>
-        ) : (
-          messages.map((m, i) => (
-            <div
-              key={i}
-              className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${
-                m.role === "user"
-                  ? "ml-auto bg-sky-600/80 text-white"
-                  : "bg-slate-800 text-slate-200"
-              }`}
-            >
-              {m.content || (streaming && i === messages.length - 1 ? "…" : "")}
-            </div>
-          ))
-        )}
-        {error ? <p className="text-center text-xs text-rose-400">{error}</p> : null}
-        <div ref={bottomRef} />
-      </div>
-      <div className="border-t border-slate-800 p-3">
-        <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send();
-              }
-            }}
-            placeholder={streaming ? "Generating…" : "Ask about your data…"}
-            disabled={streaming}
-            className="flex-1 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none"
-          />
-          <button
-            onClick={() => void send()}
-            disabled={streaming || !input.trim()}
-            className="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+    <Card className="flex h-[620px] flex-col">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="size-4 text-amber-400" />
+          AI Chat
+        </CardTitle>
+        <CardDescription>
+          Streams answers grounded in your last 14 days of health data.
+        </CardDescription>
+        <CardAction>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => clear.mutate()}
+            disabled={messages.length === 0 || streaming}
           >
-            Send
-          </button>
-        </div>
-      </div>
-    </section>
+            <Eraser />
+            Clear
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="min-h-0 flex-1">
+        <ScrollArea className="h-full" ref={viewportRef}>
+          <div className="flex flex-col gap-3 pr-3">
+            {messages.length === 0 ? (
+              <p className="pt-20 text-center text-sm text-muted-foreground">
+                Ask anything about your health data — trends, sleep quality, training load…
+              </p>
+            ) : (
+              messages.map((m, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "max-w-[85%] whitespace-pre-wrap rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
+                    m.role === "user"
+                      ? "self-end rounded-br-sm bg-primary text-primary-foreground"
+                      : "self-start rounded-bl-sm bg-muted text-foreground"
+                  )}
+                >
+                  {m.content || (streaming && i === messages.length - 1 ? "…" : "")}
+                </div>
+              ))
+            )}
+            {error ? <p className="self-center text-xs text-destructive">{error}</p> : null}
+          </div>
+        </ScrollArea>
+      </CardContent>
+      <CardFooter className="gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          placeholder={streaming ? "Generating…" : "Ask about your data…"}
+          disabled={streaming}
+        />
+        <Button onClick={() => void send()} size="icon" disabled={streaming || !input.trim()}>
+          <SendHorizontal />
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }

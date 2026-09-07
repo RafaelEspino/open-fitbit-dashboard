@@ -58,11 +58,18 @@ export async function clearChatHistory(): Promise<void> {
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 }
 
-export async function fetchReports(): Promise<AiReportMeta[]> {
-  const res = await fetch("/api/ai/reports");
+export interface ReportsPage {
+  reports: AiReportMeta[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export async function fetchReports(page = 1, pageSize = 5): Promise<ReportsPage> {
+  const res = await fetch(`/api/ai/reports?page=${page}&pageSize=${pageSize}`);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  const data = (await res.json()) as { reports: AiReportMeta[] };
-  return data.reports;
+  return res.json() as Promise<ReportsPage>;
 }
 
 export async function fetchReport(id: number): Promise<AiReportFull> {
