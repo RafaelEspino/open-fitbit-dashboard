@@ -1,11 +1,13 @@
 import { useState } from "react";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
+import AiPage from "./pages/AiPage";
 
-type Page = "dashboard" | "settings";
+type Page = "dashboard" | "ai" | "settings";
 
 const PAGES: { key: Page; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "ai", label: "AI" },
   { key: "settings", label: "Settings" },
 ];
 
@@ -35,7 +37,7 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {page === "dashboard" ? <DashboardPage /> : <SettingsPage />}
+        {page === "dashboard" ? <DashboardPage /> : page === "ai" ? <AiPage /> : <SettingsPage />}
       </main>
     </div>
   );

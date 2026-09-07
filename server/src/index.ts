@@ -10,6 +10,8 @@ import { startScheduler, type SchedulerHandle } from "./health/scheduler.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createSyncRouter } from "./routes/sync.js";
 import { createMetricsRouter } from "./routes/metrics.js";
+import { createAiRouter } from "./routes/ai.js";
+import { OpenRouterClient } from "./ai/openrouter.js";
 
 const config = loadConfig();
 const db = openDatabase(config.dataDir);
@@ -17,6 +19,7 @@ const tokenStore = new TokenStore(db, config);
 const client = new HealthClient(tokenStore);
 const sync = new SyncService(db, config, client);
 const backfill = new BackfillManager(db, sync);
+const ai = new OpenRouterClient(config);
 let scheduler: SchedulerHandle | null = null;
 
 function ensureScheduler(): void {
@@ -51,6 +54,7 @@ app.get("/api/health", (_req: Request, res: Response) => {
 app.use("/api/auth", createAuthRouter({ db, config, tokenStore, client, backfill, onConnected, onDisconnected }));
 app.use("/api/sync", createSyncRouter({ db, config, sync, backfill, client, tokenStore }));
 app.use("/api/metrics", createMetricsRouter(db));
+app.use("/api/ai", createAiRouter(db, config, ai));
 
 const indexHtml = path.join(config.staticDir, "index.html");
 app.use((req: Request, res: Response, next: NextFunction) => {

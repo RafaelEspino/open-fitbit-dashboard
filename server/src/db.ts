@@ -78,6 +78,26 @@ const MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    name: "0004_ai",
+    sql: `
+      CREATE TABLE IF NOT EXISTS chat_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL CHECK (role IN ('user','assistant')),
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS ai_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        period TEXT NOT NULL CHECK (period IN ('daily','weekly')),
+        range_start TEXT NOT NULL,
+        range_end TEXT NOT NULL,
+        model TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `,
+  },
 ];
 
 export type AppDatabase = Database.Database;
