@@ -44,7 +44,7 @@ Standard Google web-server authorization-code flow against the Google Health API
 - Tokens encrypted (AES-256-GCM via `APP_SECRET`) into SQLite
 - Access tokens refreshed **on demand** at `oauth2.googleapis.com/token` as part of the natural sync flow (Google recommends against batch/cron token refresh)
 - After consent: call `GET /v4/users/me/identity`, store `healthUserId` alongside the tokens
-- Scopes (read-only only): `googlehealth.activity_and_fitness.readonly` (steps, distance, active minutes, floors, calories, exercise), `googlehealth.health_metrics_and_measurements.readonly` (heart rate, resting HR, HRV, SpO2), `googlehealth.sleep.readonly`
+- Scopes (read-only only): `googlehealth.activity_and_fitness.readonly` (steps, distance, active minutes, floors, calories, exercise), `googlehealth.health_metrics_and_measurements.readonly` (heart rate, resting HR, HRV, SpO2), `googlehealth.sleep.readonly`, `googlehealth.settings.readonly` (pairedDevices — battery, last sync)
 
 ### Sync jobs (node-cron + backfill queue)
 

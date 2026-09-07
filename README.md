@@ -77,7 +77,9 @@ on Unraid behind a reverse proxy.
    apps only authorize listed test users) and keep publishing status as
    **Testing**. Note: test-mode refresh tokens expire after 7 days, so you
    re-consent weekly during development
-5. **Data Access page**: add the three `googlehealth.*.readonly` scopes
+5. **Data Access page**: add the four `googlehealth.*.readonly` scopes
+   (`activity_and_fitness`, `health_metrics_and_measurements`, `sleep`,
+   `settings` — the last one is needed for the device battery/last-sync panel)
 
 ### Configure and run
 
